@@ -1,0 +1,19 @@
+{
+  "name": "ward9-med",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Offline-first orthopaedic ward checklist for a 23-doctor team",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "npm test --workspaces --if-present",
+    "test:domain": "npm test -w @ward9/domain",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
