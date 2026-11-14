@@ -1,0 +1,68 @@
+{
+  "evaluate": [
+    {
+      "name": "null condition is true",
+      "cond": null,
+      "ctx": { "patient": { "age": 40 }, "admission": {}, "entries": {}, "today": "2026-11-11" },
+      "expected": true
+    },
+    {
+      "name": "eq age",
+      "cond": { "op": "eq", "path": "patient.age", "value": 40 },
+      "ctx": { "patient": { "age": 40 }, "admission": {}, "entries": {}, "today": "2026-11-11" },
+      "expected": true
+    },
+    {
+      "name": "gt age 30",
+      "cond": { "op": "gt", "path": "patient.age", "value": 30 },
+      "ctx": { "patient": { "age": 31 }, "admission": {}, "entries": {}, "today": "2026-11-11" },
+      "expected": true
+    },
+    {
+      "name": "gte 18 inclusive",
+      "cond": { "op": "gte", "path": "patient.age", "value": 18 },
+      "ctx": { "patient": { "age": 18 }, "admission": {}, "entries": {}, "today": "2026-11-11" },
+      "expected": true
+    },
+    {
+      "name": "lt 18",
+      "cond": { "op": "lt", "path": "patient.age", "value": 18 },
+      "ctx": { "patient": { "age": 17 }, "admission": {}, "entries": {}, "today": "2026-11-11" },
+      "expected": true
+    },
+    {
+      "name": "contains THR",
+      "cond": { "op": "contains", "path": "admission.planned_procedures", "value": "THR" },
+      "ctx": {
+        "patient": { "age": 45 },
+        "admission": { "planned_procedures": ["THR"] },
+        "entries": {},
+        "today": "2026-11-11"
+      },
+      "expected": true
+    },
+    {
+      "name": "in ayushman none",
+      "cond": { "op": "in", "path": "admission.ayushman_status", "value": ["none", "not_applied"] },
+      "ctx": {
+        "patient": {},
+        "admission": { "ayushman_status": "none" },
+        "entries": {},
+        "today": "2026-11-11"
+      },
+      "expected": true
+    },
+    {
+      "name": "unknown operator",
+      "cond": { "op": "xor", "path": "patient.age", "value": 1 },
+      "ctx": { "patient": { "age": 1 }, "admission": {}, "entries": {}, "today": "2026-11-11" },
+      "throws": true
+    },
+    {
+      "name": "unknown path",
+      "cond": { "op": "eq", "path": "patient.missing", "value": 1 },
+      "ctx": { "patient": { "age": 1 }, "admission": {}, "entries": {}, "today": "2026-11-11" },
+      "throws": true
+    }
+  ]
+}
