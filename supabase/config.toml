@@ -1,0 +1,45 @@
+project_id = "ward9-med"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "app", "storage", "graphql_public"]
+extra_search_path = ["public", "app", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[db.seed]
+enabled = true
+sql_paths = ["./migrations/0006_seed.sql"]
+
+[auth]
+enabled = true
+site_url = "http://localhost:8081"
+
+[auth.sms]
+enable_signup = true
+enable_confirmations = false
+
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/app/custom_access_token_hook"
+
+[auth.hook.send_sms]
+enabled = true
+uri = "http://host.docker.internal:54321/functions/v1/send-sms"
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[functions.send-sms]
+verify_jwt = false
+
+[functions.discharge-pdf]
+verify_jwt = true
+
+[functions.dispatch-push]
+verify_jwt = false

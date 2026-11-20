@@ -1,0 +1,182 @@
+config:
+  edition: 3
+
+# Tables live in the `app` schema. PowerSync source connection should set
+# search_path=app or the publication should expose these as unqualified names.
+# If your instance requires schema qualification, prefix each table with app.
+
+streams:
+  me:
+    auto_subscribe: true
+    query: |
+      SELECT id, hospital_id, name, role, active
+      FROM users WHERE id = auth.user_id()
+
+  colleagues:
+    auto_subscribe: true
+    query: |
+      SELECT id, name, role
+      FROM users
+      WHERE hospital_id = auth.parameter('hospital_id') AND active = true
+
+  my_devices:
+    auto_subscribe: true
+    query: |
+      SELECT id, user_id, hospital_id, device_label, revoked_at, last_seen_at
+      FROM user_devices
+      WHERE user_id = auth.user_id()
+
+  hospital_settings:
+    auto_subscribe: true
+    query: |
+      SELECT id, name, visibility_mode, sync_discharged_hours, min_client_version, timezone, grievance_contact
+      FROM hospitals WHERE id = auth.parameter('hospital_id')
+
+  checklist_items:
+    auto_subscribe: true
+    query: |
+      SELECT id, hospital_id, stage, item_key, label, help_text, field_type,
+             required, applies_when, options, sort_order, active
+      FROM checklist_items
+      WHERE hospital_id = auth.parameter('hospital_id') AND active = true
+
+  workflow_transitions:
+    auto_subscribe: true
+    query: |
+      SELECT id, hospital_id, from_stage, to_stage, guard, requires_reason, label, completes_admission
+      FROM workflow_transitions
+      WHERE hospital_id = auth.parameter('hospital_id')
+
+  admissions:
+    auto_subscribe: true
+    query: |
+      SELECT id, hospital_id, patient_id, status, current_stage, admitted_at,
+             brought_by_name, brought_by_relation, brought_by_phone, is_mlc,
+             ayushman_status, wound_type, planned_procedures, surgery_date,
+             photo_consent, photo_consent_by, photo_consent_at, fitness_attempt,
+             discharged_at, cancel_reason, updated_at, updated_by, device_id
+      FROM admissions a
+      WHERE a.hospital_id = auth.parameter('hospital_id')
+        AND (
+          a.status = 'active'
+          OR (
+            a.status = 'discharged'
+            AND a.discharged_at > now() - make_interval(
+              hours => (SELECT sync_discharged_hours FROM hospitals h WHERE h.id = a.hospital_id)
+            )
+          )
+        )
+        AND (
+          auth.parameter('role') = 'admin'
+          OR (SELECT visibility_mode FROM hospitals h WHERE h.id = a.hospital_id) = 'ward'
+          OR a.id IN (SELECT admission_id FROM admission_team t WHERE t.user_id = auth.user_id())
+        )
+
+  patients:
+    auto_subscribe: true
+    query: |
+      SELECT id, hospital_id, name, age, sex, father_name, address, mobile, past_history, abha_id, created_at, updated_at
+      FROM patients p
+      WHERE p.id IN (
+        SELECT patient_id FROM admissions a
+        WHERE a.hospital_id = auth.parameter('hospital_id')
+          AND (
+            a.status = 'active'
+            OR (
+              a.status = 'discharged'
+              AND a.discharged_at > now() - make_interval(
+                hours => (SELECT sync_discharged_hours FROM hospitals h WHERE h.id = a.hospital_id)
+              )
+            )
+          )
+          AND (
+            auth.parameter('role') = 'admin'
+            OR (SELECT visibility_mode FROM hospitals h WHERE h.id = a.hospital_id) = 'ward'
+            OR a.id IN (SELECT admission_id FROM admission_team t WHERE t.user_id = auth.user_id())
+          )
+      )
+
+  entries:
+    auto_subscribe: true
+    query: |
+      SELECT id, hospital_id, admission_id, item_key, value, done_by, done_at, updated_at, device_id, client_mutation_id
+      FROM checklist_entries
+      WHERE admission_id IN (
+        SELECT id FROM admissions a
+        WHERE a.hospital_id = auth.parameter('hospital_id')
+          AND (
+            a.status = 'active'
+            OR (
+              a.status = 'discharged'
+              AND a.discharged_at > now() - make_interval(
+                hours => (SELECT sync_discharged_hours FROM hospitals h WHERE h.id = a.hospital_id)
+              )
+            )
+          )
+          AND (
+            auth.parameter('role') = 'admin'
+            OR (SELECT visibility_mode FROM hospitals h WHERE h.id = a.hospital_id) = 'ward'
+            OR a.id IN (SELECT admission_id FROM admission_team t WHERE t.user_id = auth.user_id())
+          )
+      )
+
+  team:
+    auto_subscribe: true
+    query: |
+      SELECT admission_id, user_id, hospital_id, team_role, assigned_at
+      FROM admission_team
+      WHERE hospital_id = auth.parameter('hospital_id')
+        AND admission_id IN (
+          SELECT id FROM admissions a
+          WHERE a.hospital_id = auth.parameter('hospital_id')
+            AND (
+              a.status = 'active'
+              OR (
+                a.status = 'discharged'
+                AND a.discharged_at > now() - make_interval(
+                  hours => (SELECT sync_discharged_hours FROM hospitals h WHERE h.id = a.hospital_id)
+                )
+              )
+            )
+        )
+
+  attachments:
+    auto_subscribe: true
+    query: |
+      SELECT id, hospital_id, admission_id, entry_id, kind, storage_path, upload_status, uploaded_by, created_at
+      FROM attachments
+      WHERE hospital_id = auth.parameter('hospital_id')
+        AND admission_id IN (
+          SELECT id FROM admissions a
+          WHERE a.hospital_id = auth.parameter('hospital_id')
+            AND (
+              a.status = 'active'
+              OR (
+                a.status = 'discharged'
+                AND a.discharged_at > now() - make_interval(
+                  hours => (SELECT sync_discharged_hours FROM hospitals h WHERE h.id = a.hospital_id)
+                )
+              )
+            )
+        )
+
+  stage_transitions:
+    auto_subscribe: true
+    query: |
+      SELECT id, hospital_id, admission_id, from_stage, to_stage, reason, override, by_user, at, device_id
+      FROM stage_transitions
+      WHERE hospital_id = auth.parameter('hospital_id')
+        AND at > now() - interval '14 days'
+        AND admission_id IN (
+          SELECT id FROM admissions a
+          WHERE a.hospital_id = auth.parameter('hospital_id')
+            AND (
+              a.status = 'active'
+              OR (
+                a.status = 'discharged'
+                AND a.discharged_at > now() - make_interval(
+                  hours => (SELECT sync_discharged_hours FROM hospitals h WHERE h.id = a.hospital_id)
+                )
+              )
+            )
+        )
